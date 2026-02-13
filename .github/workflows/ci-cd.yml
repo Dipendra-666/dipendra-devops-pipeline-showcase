@@ -1,5 +1,9 @@
 name: CI/CD Showcase Pipeline
 
+permissions:
+  id-token: write   
+  contents: read    
+
 on:
   push:
     branches: [ "main" ]
@@ -79,3 +83,65 @@ jobs:
         with:
           name: app-build
           path: dist/
+
+  deploy-staging:
+    needs: build 
+    runs-on: ubuntu-latest
+    environment: staging  
+
+    steps:
+      - name: Checkout code  
+        uses: actions/checkout@v4
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-build
+          path: dist/
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Staging
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: dipendra-staging-app-hthxe6e5cpdgg6dd.centralindia-01.azurewebsites.net
+          package: dist/
+      
+      - name: Debug - List App Services in RG
+        run: az webapp list --resource-group dipendra-rg --query "[].name" -o table
+
+      - name: Debug - List all App Services in subscription
+        run: az webapp list --query "[].{Name:name, ResourceGroup:resourceGroup, Location:location}" -o table
+
+  deploy-prod:
+    needs: deploy-staging  
+    runs-on: ubuntu-latest
+    environment: production  
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-build
+          path: dist/
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Production
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: dipendra-production-app-cxe9eff4e2atbjhq.centralindia-01.azurewebsites.net
+          package: dist/
